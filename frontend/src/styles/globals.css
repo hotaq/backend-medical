@@ -1,0 +1,477 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Import Inter font from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+/* Base styles */
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-gray-50 text-gray-900 antialiased;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-100;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400;
+  }
+
+  /* Focus styles */
+  *:focus {
+    outline: none;
+  }
+
+  .focus-ring {
+    @apply focus:ring-2 focus:ring-medical-500 focus:ring-offset-2 focus:ring-offset-white;
+  }
+
+  /* Selection styles */
+  ::selection {
+    @apply bg-medical-100 text-medical-900;
+  }
+}
+
+/* Component styles */
+@layer components {
+  /* Button variants */
+  .btn {
+    @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 focus-ring disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-primary {
+    @apply btn bg-medical-600 text-white hover:bg-medical-700 active:bg-medical-800;
+  }
+
+  .btn-secondary {
+    @apply btn bg-gray-200 text-gray-900 hover:bg-gray-300 active:bg-gray-400;
+  }
+
+  .btn-danger {
+    @apply btn bg-red-600 text-white hover:bg-red-700 active:bg-red-800;
+  }
+
+  .btn-success {
+    @apply btn bg-green-600 text-white hover:bg-green-700 active:bg-green-800;
+  }
+
+  .btn-outline {
+    @apply btn border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 active:bg-gray-100;
+  }
+
+  /* Card styles */
+  .card {
+    @apply bg-white rounded-xl border border-gray-200 shadow-sm;
+  }
+
+  .card-header {
+    @apply px-6 py-4 border-b border-gray-200;
+  }
+
+  .card-body {
+    @apply px-6 py-4;
+  }
+
+  .card-footer {
+    @apply px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl;
+  }
+
+  /* Medical card variants */
+  .medical-card {
+    @apply card border-medical-200 shadow-medical;
+  }
+
+  .urgency-card-critical {
+    @apply card border-red-300 bg-red-50;
+  }
+
+  .urgency-card-high {
+    @apply card border-orange-300 bg-orange-50;
+  }
+
+  .urgency-card-medium {
+    @apply card border-yellow-300 bg-yellow-50;
+  }
+
+  .urgency-card-low {
+    @apply card border-green-300 bg-green-50;
+  }
+
+  /* Form styles */
+  .form-input {
+    @apply block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:ring-medical-500 focus:border-medical-500 transition-colors duration-200;
+  }
+
+  .form-label {
+    @apply block text-sm font-medium text-gray-700 mb-2;
+  }
+
+  .form-error {
+    @apply mt-1 text-sm text-red-600;
+  }
+
+  .form-help {
+    @apply mt-1 text-sm text-gray-500;
+  }
+
+  /* Badge styles */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-urgency-critical {
+    @apply badge bg-red-100 text-red-800;
+  }
+
+  .badge-urgency-high {
+    @apply badge bg-orange-100 text-orange-800;
+  }
+
+  .badge-urgency-medium {
+    @apply badge bg-yellow-100 text-yellow-800;
+  }
+
+  .badge-urgency-low {
+    @apply badge bg-green-100 text-green-800;
+  }
+
+  .badge-status-pending {
+    @apply badge bg-gray-100 text-gray-800;
+  }
+
+  .badge-status-processing {
+    @apply badge bg-blue-100 text-blue-800;
+  }
+
+  .badge-status-completed {
+    @apply badge bg-green-100 text-green-800;
+  }
+
+  .badge-status-failed {
+    @apply badge bg-red-100 text-red-800;
+  }
+
+  /* Alert styles */
+  .alert {
+    @apply p-4 rounded-lg border;
+  }
+
+  .alert-info {
+    @apply alert bg-blue-50 border-blue-200 text-blue-800;
+  }
+
+  .alert-success {
+    @apply alert bg-green-50 border-green-200 text-green-800;
+  }
+
+  .alert-warning {
+    @apply alert bg-yellow-50 border-yellow-200 text-yellow-800;
+  }
+
+  .alert-error {
+    @apply alert bg-red-50 border-red-200 text-red-800;
+  }
+
+  /* Navigation styles */
+  .nav-link {
+    @apply flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200;
+  }
+
+  .nav-link-active {
+    @apply nav-link bg-medical-100 text-medical-900;
+  }
+
+  .nav-link-inactive {
+    @apply nav-link text-gray-600 hover:text-gray-900 hover:bg-gray-100;
+  }
+
+  /* Loading styles */
+  .spinner {
+    @apply inline-block animate-spin rounded-full border-2 border-solid border-current border-r-transparent;
+  }
+
+  .spinner-sm {
+    @apply spinner h-4 w-4;
+  }
+
+  .spinner-md {
+    @apply spinner h-6 w-6;
+  }
+
+  .spinner-lg {
+    @apply spinner h-8 w-8;
+  }
+
+  /* Chat styles */
+  .chat-message {
+    @apply flex items-start space-x-3 p-4 rounded-lg;
+  }
+
+  .chat-message-user {
+    @apply chat-message bg-medical-50 ml-12;
+  }
+
+  .chat-message-bot {
+    @apply chat-message bg-gray-50 mr-12;
+  }
+
+  .chat-input {
+    @apply form-input resize-none min-h-[44px] max-h-32 pr-12;
+  }
+
+  /* Medical data styles */
+  .vital-sign {
+    @apply flex justify-between items-center py-2 px-3 rounded-lg bg-gray-50 border border-gray-200;
+  }
+
+  .vital-sign-critical {
+    @apply vital-sign bg-red-50 border-red-200 text-red-900;
+  }
+
+  .vital-sign-abnormal {
+    @apply vital-sign bg-yellow-50 border-yellow-200 text-yellow-900;
+  }
+
+  .vital-sign-normal {
+    @apply vital-sign bg-green-50 border-green-200 text-green-900;
+  }
+
+  /* Triage score styles */
+  .triage-score-display {
+    @apply text-3xl font-bold text-center p-6 rounded-xl border-2;
+  }
+
+  .triage-score-critical {
+    @apply triage-score-display bg-red-50 border-red-300 text-red-700;
+  }
+
+  .triage-score-high {
+    @apply triage-score-display bg-orange-50 border-orange-300 text-orange-700;
+  }
+
+  .triage-score-medium {
+    @apply triage-score-display bg-yellow-50 border-yellow-300 text-yellow-700;
+  }
+
+  .triage-score-low {
+    @apply triage-score-display bg-green-50 border-green-300 text-green-700;
+  }
+
+  /* Progress bar styles */
+  .progress-bar {
+    @apply w-full bg-gray-200 rounded-full overflow-hidden;
+  }
+
+  .progress-fill {
+    @apply h-full bg-medical-600 transition-all duration-500 ease-out;
+  }
+
+  /* Metric card styles */
+  .metric-card {
+    @apply card p-6 hover:shadow-lg transition-shadow duration-200;
+  }
+
+  .metric-value {
+    @apply text-2xl font-bold text-gray-900;
+  }
+
+  .metric-label {
+    @apply text-sm text-gray-500 mt-1;
+  }
+
+  .metric-change-positive {
+    @apply text-green-600 text-sm font-medium;
+  }
+
+  .metric-change-negative {
+    @apply text-red-600 text-sm font-medium;
+  }
+
+  .metric-change-neutral {
+    @apply text-gray-600 text-sm font-medium;
+  }
+}
+
+/* Utility styles */
+@layer utilities {
+  /* Text utilities */
+  .text-medical {
+    @apply text-medical-600;
+  }
+
+  .text-urgency-critical {
+    @apply text-red-600;
+  }
+
+  .text-urgency-high {
+    @apply text-orange-600;
+  }
+
+  .text-urgency-medium {
+    @apply text-yellow-600;
+  }
+
+  .text-urgency-low {
+    @apply text-green-600;
+  }
+
+  /* Background utilities */
+  .bg-medical {
+    @apply bg-medical-600;
+  }
+
+  /* Border utilities */
+  .border-medical {
+    @apply border-medical-600;
+  }
+
+  /* Animation utilities */
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  .animate-slide-down {
+    animation: slideDown 0.3s ease-out;
+  }
+
+  .animate-processing {
+    animation: processing 2s ease-in-out infinite;
+  }
+
+  /* Layout utilities */
+  .container-medical {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  .section-medical {
+    @apply py-8 lg:py-12;
+  }
+
+  /* Glass morphism */
+  .glass {
+    @apply bg-white/80 backdrop-blur-sm border border-white/20;
+  }
+
+  .glass-dark {
+    @apply bg-gray-900/80 backdrop-blur-sm border border-gray-700/20;
+  }
+
+  /* Medical theme gradients */
+  .gradient-medical {
+    background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  }
+
+  .gradient-urgency-critical {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  }
+
+  .gradient-urgency-high {
+    background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  }
+
+  .gradient-urgency-medium {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  }
+
+  .gradient-urgency-low {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  }
+}
+
+/* Dark mode styles */
+@media (prefers-color-scheme: dark) {
+  .dark {
+    @apply bg-gray-900 text-gray-100;
+  }
+
+  .dark .card {
+    @apply bg-gray-800 border-gray-700;
+  }
+
+  .dark .form-input {
+    @apply bg-gray-800 border-gray-600 text-gray-100 placeholder-gray-400;
+  }
+
+  .dark .nav-link-inactive {
+    @apply text-gray-400 hover:text-gray-100 hover:bg-gray-800;
+  }
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  body {
+    @apply text-black bg-white;
+  }
+
+  .card {
+    @apply border border-gray-300 shadow-none;
+  }
+}
+
+/* Mobile-specific styles */
+@media (max-width: 640px) {
+  .mobile-full {
+    @apply w-full;
+  }
+
+  .mobile-hidden {
+    @apply hidden;
+  }
+
+  .mobile-stack {
+    @apply flex-col space-y-2 space-x-0;
+  }
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .card {
+    @apply border-2 border-gray-900;
+  }
+
+  .btn {
+    @apply border-2;
+  }
+}

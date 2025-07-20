@@ -576,6 +576,305 @@ async def log_audit_event(
         logger.error(f"Failed to log audit event: {e}")
 
 
+@app.get("/database/cases")
+async def get_cases(
+    page: int = 1,
+    limit: int = 20,
+    urgency_level: Optional[str] = None,
+    department: Optional[str] = None,
+    search: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    session: AsyncSession = Depends(get_db_session)
+):
+    """Get paginated list of triage cases"""
+    try:
+        # Calculate offset
+        offset = (page - 1) * limit
+
+        # Build query
+        query = session.query(TriageCase)
+
+        # Apply filters
+        if urgency_level:
+            query = query.filter(TriageCase.priority_level == urgency_level)
+        if department:
+            query = query.filter(TriageCase.target_department == department)
+        if search:
+            search_term = f"%{search}%"
+            query = query.filter(
+                or_(
+                    TriageCase.case_id.like(search_term),
+                    TriageCase.chief_complaint.like(search_term),
+                    TriageCase.symptoms_text.like(search_term)
+                )
+            )
+        if date_from:
+            query = query.filter(TriageCase.created_at >= date_from)
+        if date_to:
+            query = query.filter(TriageCase.created_at <= date_to)
+
+        # Get total count
+        total = await session.execute(
+            select(func.count()).select_from(query.subquery())
+        )
+        total_count = total.scalar()
+
+        # Get paginated results
+        cases = await session.execute(
+            query.offset(offset).limit(limit)
+            .options(
+                selectinload(TriageCase.patient),
+                selectinload(TriageCase.triage_result)
+            )
+        )
+
+        return {
+            "data": cases.scalars().all(),
+            "total": total_count,
+            "page": page,
+            "limit": limit,
+            "has_next": (page * limit) < total_count,
+            "has_prev": page > 1
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get cases: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get cases: {str(e)}")
+
+
+@app.get("/database/cases/{case_id}")
+async def get_case(
+    case_id: str,
+    session: AsyncSession = Depends(get_db_session)
+):
+    """Get specific triage case with full details"""
+    try:
+        case = await TriageCaseCRUD.get_triage_case_by_id(
+            session,
+            case_id,
+            include_relations=True
+        )
+        if not case:
+            raise HTTPException(status_code=404, detail="Case not found")
+
+        return case
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get case {case_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get case: {str(e)}")
+
+
+@app.get("/database/cases/{case_id}/processing")
+async def get_case_processing_history(
+    case_id: str,
+    session: AsyncSession = Depends(get_db_session)
+):
+    """Get processing history for a specific case"""
+    try:
+        history = await CaseProcessingCRUD.get_case_processing_history(session, case_id)
+        return history
+
+    except Exception as e:
+        logger.error(f"Failed to get processing history for {case_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get processing history: {str(e)}")
+
+
+@app.post("/chat")
+async def send_chat_message(
+    message_data: dict,
+    session: AsyncSession = Depends(get_db_session)
+):
+    """Send message to LLM and get response"""
+    try:
+        message = message_data.get("message", "")
+        case_id = message_data.get("case_id")
+        include_context = message_data.get("include_context", False)
+
+        if not message.strip():
+            raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+        # Prepare context if case_id is provided
+        context = ""
+        if case_id and include_context:
+            try:
+                case = await TriageCaseCRUD.get_triage_case_by_id(session, case_id)
+                if case:
+                    context = f"Case Context: {case.chief_complaint} - {case.symptoms_text}"
+            except Exception as e:
+                logger.warning(f"Failed to get case context: {e}")
+
+        # Create enhanced prompt
+        if context:
+            enhanced_message = f"Medical Case Context: {context}\n\nUser Question: {message}"
+        else:
+            enhanced_message = f"Medical Question: {message}"
+
+        # For now, return a simulated response
+        # In production, integrate with actual LLM service
+        response_content = await simulate_llm_response(enhanced_message)
+
+        # Create response message
+        response = {
+            "id": f"msg_{int(time.time() * 1000)}",
+            "role": "assistant",
+            "content": response_content,
+            "timestamp": datetime.now().isoformat(),
+            "case_id": case_id,
+            "metadata": {
+                "processing_time": 1500,  # ms
+                "model_used": "medical-llm-v1",
+                "confidence": 0.85
+            }
+        }
+
+        return response
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Chat processing failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Chat processing failed: {str(e)}")
+
+
+@app.get("/chat/history")
+async def get_chat_history(
+    case_id: Optional[str] = None,
+    limit: int = 50
+):
+    """Get chat message history"""
+    try:
+        # For now, return empty history
+        # In production, implement chat history storage
+        return []
+
+    except Exception as e:
+        logger.error(f"Failed to get chat history: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get chat history: {str(e)}")
+
+
+@app.get("/analytics/dashboard")
+async def get_dashboard_analytics(
+    session: AsyncSession = Depends(get_db_session)
+):
+    """Get dashboard analytics data"""
+    try:
+        # Calculate analytics from database
+        today = datetime.now().date()
+
+        # Total cases today
+        total_cases_query = select(func.count(TriageCase.id)).where(
+            func.date(TriageCase.created_at) == today
+        )
+        total_cases = await session.execute(total_cases_query)
+        total_cases_count = total_cases.scalar() or 0
+
+        # Critical cases today
+        critical_cases_query = select(func.count(TriageCase.id)).where(
+            and_(
+                func.date(TriageCase.created_at) == today,
+                TriageCase.priority_level == UrgencyLevelEnum.CRITICAL
+            )
+        )
+        critical_cases = await session.execute(critical_cases_query)
+        critical_cases_count = critical_cases.scalar() or 0
+
+        # Mock data for other metrics
+        return {
+            "total_cases": total_cases_count,
+            "critical_cases": critical_cases_count,
+            "avg_processing_time": 2.3,
+            "success_rate": 94.5,
+            "cases_by_urgency": {
+                "critical": critical_cases_count,
+                "high": max(0, total_cases_count - critical_cases_count),
+                "medium": 0,
+                "low": 0
+            },
+            "cases_by_hour": [
+                {"hour": f"{i:02d}:00", "count": max(0, total_cases_count - i)}
+                for i in range(24)
+            ],
+            "processing_times": [
+                {"agent": "Vision Bot", "avg_time": 2.3},
+                {"agent": "Text Bot", "avg_time": 1.8},
+                {"agent": "Chief Bot", "avg_time": 3.1}
+            ]
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get dashboard analytics: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get analytics: {str(e)}")
+
+
+async def simulate_llm_response(message: str) -> str:
+    """Simulate LLM response for medical questions"""
+    # Add some delay to simulate processing
+    await asyncio.sleep(1)
+
+    message_lower = message.lower()
+
+    if "diabetes" in message_lower:
+        return """Diabetes symptoms typically include:
+- Increased thirst and frequent urination
+- Unexplained weight loss
+- Fatigue and weakness
+- Blurred vision
+- Slow-healing wounds
+- Frequent infections
+
+For diagnosis, we typically look at fasting glucose levels (>126 mg/dL), HbA1c (>6.5%), or oral glucose tolerance test results. Early detection and management are crucial for preventing complications."""
+
+    elif "system health" in message_lower or "health" in message_lower:
+        return f"""Current system status:
+- Overall health: Operational
+- Database: Connected and responsive
+- Vision Bot: Active and processing images
+- Text Bot: Active and analyzing symptoms
+- Chief Bot: Coordinating triage decisions
+
+All systems are functioning normally. Average processing time is 2.3 seconds per case."""
+
+    elif "critical" in message_lower or "cases" in message_lower:
+        return f"""Current triage summary:
+- Total cases processed today: {app_metrics['total_requests']}
+- Critical cases: {app_metrics['critical_cases']}
+- High priority cases: {app_metrics['high_priority_cases']}
+- Average processing time: {app_metrics['average_processing_time']:.1f}ms
+
+Critical cases require immediate attention and are automatically flagged for emergency department review."""
+
+    elif "scoring" in message_lower or "triage" in message_lower:
+        return """Our triage scoring system uses a multi-modal approach:
+
+1. **Text Analysis**: Symptom severity, medical history, and risk factors
+2. **Vision Analysis**: Medical image interpretation when provided
+3. **Structured Data**: Lab results, vital signs, and clinical measurements
+
+Scores range from 0-1, with urgency levels:
+- 0.0-0.25: Low priority (Green)
+- 0.25-0.5: Medium priority (Yellow)
+- 0.5-0.75: High priority (Orange)
+- 0.75-1.0: Critical priority (Red)
+
+The system combines all available data sources to provide the most accurate triage decision."""
+
+    else:
+        return f"""I'm a medical AI assistant integrated with the Triage-BOTS system. I can help with:
+
+- Medical symptom analysis and information
+- System status and performance metrics
+- Triage scoring explanations
+- Case management guidance
+- Clinical decision support
+
+Your question: "{message[:100]}..."
+
+Please feel free to ask specific medical questions or request information about the triage system."""
+
+
 if __name__ == "__main__":
     import uvicorn
 
