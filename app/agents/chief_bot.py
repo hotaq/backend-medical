@@ -28,6 +28,7 @@ from ..models.triage_case import (
     DataType
 )
 from ..models.pydantic_compat import model_dump
+from .text_bot import TextBOT
 from .vision_bot import VisionBot, VisionBotConfig
 
 
@@ -123,6 +124,11 @@ class ChiefBOT:
             "total_processing": 60
         }
 
+        # Initialize agents
+        self.text_bot = TextBOT()
+        logger.info(f"TextBOT initialized in ChiefBOT: {self.text_bot.agent_name}")
+
+        logger.info(f"Chief-BOT initialized with config: {self.config}")
     async def process_triage_case(
         self,
         triage_case: PydanticTriageCase,
@@ -267,9 +273,9 @@ class ChiefBOT:
                     )
                 )
             else:
-                # Mock text agent for testing
+                # Use real TextBOT agent
                 task = asyncio.create_task(
-                    self._mock_text_agent(triage_case.symptoms_text or triage_case.chief_complaint)
+                    self._real_text_agent(triage_case)
                 )
             tasks.append(task)
             task_names.append("text")
@@ -285,9 +291,9 @@ class ChiefBOT:
                     )
                 )
             else:
-                # Mock structured agent for testing
+                # Use real TextBOT for structured data analysis
                 task = asyncio.create_task(
-                    self._mock_structured_agent(triage_case.structured_data)
+                    self._real_text_agent(triage_case)
                 )
             tasks.append(task)
             task_names.append("structured")
@@ -634,7 +640,9 @@ class ChiefBOT:
             if result.success and result.raw_output and "recommendations" in result.raw_output:
                 agent_recommendations = result.raw_output["recommendations"]
                 if isinstance(agent_recommendations, list):
-                    recommendations.extend(agent_recommendations)
+                    # Limit recommendations per agent to avoid overwhelming output
+                    recommendations.extend(agent_recommendations[:10])
+                    logger.info(f"Added {len(agent_recommendations[:10])} recommendations from {agent_name} agent")
 
         decision.recommendations = recommendations
 
@@ -658,8 +666,55 @@ class ChiefBOT:
             model_version="efficientnet_v2_mock"
         )
 
-    async def _mock_text_agent(self, symptoms_text: str) -> AgentResult:
-        """Mock TextBOT agent for testing"""
+    async def _real_text_agent(self, triage_case: PydanticTriageCase) -> AgentResult:
+        """Real TextBOT agent for structured data analysis"""
+        try:
+            logger.info(f"_real_text_agent called for case {triage_case.case_id}")
+            logger.info(f"Structured data available: {triage_case.structured_data is not None}")
+            if triage_case.structured_data:
+                logger.info(f"Number of structured data items: {len(triage_case.structured_data)}")
+
+            # Use structured data if available
+            if triage_case.structured_data:
+                logger.info("Processing structured data with TextBOT")
+                result = await self.text_bot.process_structured_data(triage_case.structured_data)
+                logger.info(f"TextBOT result: success={result.success}, score={result.overall_risk_score}, category={result.risk_category}")
+
+                # Add recommendations to raw_output for ChiefBOT synthesis
+                enhanced_raw_output = result.raw_output.copy()
+                enhanced_raw_output["recommendations"] = result.recommendations
+                enhanced_raw_output["risk_score"] = result.overall_risk_score
+                enhanced_raw_output["risk_category"] = result.risk_category
+
+                return AgentResult(
+                    agent_type=AgentType.TEXT_BOT,
+                    success=result.success,
+                    raw_output=enhanced_raw_output,
+                    synthesized_output=f"Medical data analysis indicates {result.risk_category} risk (score: {result.overall_risk_score:.3f}). Models used: {', '.join(result.models_used)}. {len(result.recommendations)} recommendations generated.",
+                    confidence_score=result.confidence_score,
+                    processing_time_ms=result.processing_time_ms,
+                    model_version="TextBOT_v1.0.0"
+                )
+            else:
+                logger.info("No structured data, using fallback text analysis")
+                # Fallback to text analysis if no structured data
+                return await self._mock_text_agent_fallback(triage_case.symptoms_text or triage_case.chief_complaint or "")
+
+        except Exception as e:
+            logger.error(f"TextBOT agent error: {str(e)}")
+            import traceback
+            logger.error(f"TextBOT traceback: {traceback.format_exc()}")
+            return AgentResult(
+                agent_type=AgentType.TEXT_BOT,
+                success=False,
+                error_message=f"TextBOT processing failed: {str(e)}",
+                confidence_score=0.0,
+                processing_time_ms=0,
+                model_version="TextBOT_v1.0.0"
+            )
+
+    async def _mock_text_agent_fallback(self, symptoms_text: str) -> AgentResult:
+        """Fallback text analysis for cases without structured data"""
         await asyncio.sleep(0.1)  # Simulate processing time
 
         # Simple risk assessment based on keywords
@@ -683,7 +738,7 @@ class ChiefBOT:
             synthesized_output=f"Text analysis of symptoms indicates {'high' if risk_score > 0.6 else 'moderate' if risk_score > 0.4 else 'low'} clinical risk requiring appropriate medical evaluation.",
             confidence_score=0.78,
             processing_time_ms=420,
-            model_version="text_analyzer_mock"
+            model_version="text_analyzer_fallback"
         )
 
     async def _mock_structured_agent(self, structured_data) -> AgentResult:

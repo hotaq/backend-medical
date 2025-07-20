@@ -46,7 +46,7 @@ try:
     )
     from app.database.crud import CaseProcessingCRUD
     from app.database.models import ProcessingStatusEnum
-    from app.database.database import DatabaseManager
+    from app.database.config import DatabaseManager
 except ImportError as e:
     print(f"App imports failed: {e}")
     print("Please ensure all app modules are available")

@@ -1,0 +1,44 @@
+# FastAPI Requirements for Medical Triage-BOTS System
+# Core API dependencies for the refactored /triage endpoint
+
+# FastAPI and web server
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+
+# Database
+sqlalchemy>=2.0.0
+aiosqlite>=0.19.0
+alembic>=1.12.0
+
+# Async support
+asyncio-mqtt>=0.13.0
+asyncpg>=0.29.0  # For PostgreSQL support (optional)
+
+# Data validation and serialization
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# HTTP and networking
+httpx>=0.25.0
+requests>=2.31.0
+
+# File handling
+pillow>=10.0.0
+python-magic>=0.4.27
+
+# Logging and monitoring
+structlog>=23.0.0
+
+# Development and testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-mock>=3.11.0
+
+# Security
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+
+# Utilities
+python-dotenv>=1.0.0
+tenacity>=8.2.0
