@@ -28,7 +28,7 @@ RUN pip install --no-cache-dir -r api_requirements.txt
 
 # Copy migration scripts and app modules
 COPY app/ ./app/
-COPY migrate_db.py ./
+COPY scripts/migrate_db.py ./
 COPY main.py ./
 
 # Create necessary directories
