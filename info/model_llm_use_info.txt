@@ -1,0 +1,302 @@
+MedGemma model card
+Model documentation: MedGemma
+
+Resources:
+
+Model on Google Cloud Model Garden: MedGemma
+Model on Hugging Face: MedGemma
+GitHub repository (supporting code, Colab notebooks, discussions, and issues): MedGemma
+Quick start notebook: GitHub
+Fine-tuning notebook: GitHub
+Concept applications built using MedGemma: Collection
+Support: See Contact
+License: The use of MedGemma is governed by the Health AI Developer Foundations terms of use.
+Author: Google
+
+Model information
+This section describes the MedGemma model and how to use it.
+
+Description
+MedGemma is a collection of Gemma 3 variants that are trained for performance on medical text and image comprehension. Developers can use MedGemma to accelerate building healthcare-based AI applications. MedGemma currently comes in three variants: a 4B multimodal version and 27B text-only and multimodal versions.
+
+Both MedGemma multimodal versions utilize a SigLIP image encoder that has been specifically pre-trained on a variety of de-identified medical data, including chest X-rays, dermatology images, ophthalmology images, and histopathology slides. Their LLM components are trained on a diverse set of medical data, including medical text, medical question-answer pairs, FHIR-based electronic health record data (27B multimodal only), radiology images, histopathology patches, ophthalmology images, and dermatology images.
+
+MedGemma 4B is available in both pre-trained (suffix: -pt) and instruction-tuned (suffix -it) versions. The instruction-tuned version is a better starting point for most applications. The pre-trained version is available for those who want to experiment more deeply with the models.
+
+MedGemma 27B multimodal has pre-training on medical image, medical record and medical record comprehension tasks. MedGemma 27B text-only has been trained exclusively on medical text. Both models have been optimized for inference-time computation on medical reasoning. This means it has slightly higher performance on some text benchmarks than MedGemma 27B multimodal. Users who want to work with a single model for both medical text, medical record and medical image tasks are better suited for MedGemma 27B multimodal. Those that only need text use-cases may be better served with the text-only variant. Both MedGemma 27B variants are only available in instruction-tuned versions.
+
+MedGemma variants have been evaluated on a range of clinically relevant benchmarks to illustrate their baseline performance. These evaluations are based on both open benchmark datasets and curated datasets. Developers can fine-tune MedGemma variants for improved performance. Consult the Intended Use section below for more details.
+
+MedGemma is optimized for medical applications that involve a text generation component. For medical image-based applications that do not involve text generation, such as data-efficient classification, zero-shot classification, or content-based or semantic image retrieval, the MedSigLIP image encoder is recommended. MedSigLIP is based on the same image encoder that powers MedGemma.
+
+Please consult the MedGemma Technical Report for more details.
+
+How to use
+Below are some example code snippets to help you quickly get started running the model locally on GPU. If you want to use the model at scale, we recommend that you create a production version using Model Garden.
+
+First, install the Transformers library. Gemma 3 is supported starting from transformers 4.50.0.
+
+$ pip install -U transformers
+
+Run model with the pipeline API
+
+from transformers import pipeline
+from PIL import Image
+import requests
+import torch
+
+pipe = pipeline(
+    "image-text-to-text",
+    model="google/medgemma-4b-it",
+    torch_dtype=torch.bfloat16,
+    device="cuda",
+)
+
+# Image attribution: Stillwaterising, CC0, via Wikimedia Commons
+image_url = "https://upload.wikimedia.org/wikipedia/commons/c/c8/Chest_Xray_PA_3-8-2010.png"
+image = Image.open(requests.get(image_url, headers={"User-Agent": "example"}, stream=True).raw)
+
+messages = [
+    {
+        "role": "system",
+        "content": [{"type": "text", "text": "You are an expert radiologist."}]
+    },
+    {
+        "role": "user",
+        "content": [
+            {"type": "text", "text": "Describe this X-ray"},
+            {"type": "image", "image": image}
+        ]
+    }
+]
+
+output = pipe(text=messages, max_new_tokens=200)
+print(output[0]["generated_text"][-1]["content"])
+
+Run the model directly
+
+# pip install accelerate
+from transformers import AutoProcessor, AutoModelForImageTextToText
+from PIL import Image
+import requests
+import torch
+
+model_id = "google/medgemma-4b-it"
+
+model = AutoModelForImageTextToText.from_pretrained(
+    model_id,
+    torch_dtype=torch.bfloat16,
+    device_map="auto",
+)
+processor = AutoProcessor.from_pretrained(model_id)
+
+# Image attribution: Stillwaterising, CC0, via Wikimedia Commons
+image_url = "https://upload.wikimedia.org/wikipedia/commons/c/c8/Chest_Xray_PA_3-8-2010.png"
+image = Image.open(requests.get(image_url, headers={"User-Agent": "example"}, stream=True).raw)
+
+messages = [
+    {
+        "role": "system",
+        "content": [{"type": "text", "text": "You are an expert radiologist."}]
+    },
+    {
+        "role": "user",
+        "content": [
+            {"type": "text", "text": "Describe this X-ray"},
+            {"type": "image", "image": image}
+        ]
+    }
+]
+
+inputs = processor.apply_chat_template(
+    messages, add_generation_prompt=True, tokenize=True,
+    return_dict=True, return_tensors="pt"
+).to(model.device, dtype=torch.bfloat16)
+
+input_len = inputs["input_ids"].shape[-1]
+
+with torch.inference_mode():
+    generation = model.generate(**inputs, max_new_tokens=200, do_sample=False)
+    generation = generation[0][input_len:]
+
+decoded = processor.decode(generation, skip_special_tokens=True)
+print(decoded)
+
+Examples
+See the following Colab notebooks for examples of how to use MedGemma:
+
+To give the model a quick try, running it locally with weights from Hugging Face, see Quick start notebook in Colab. Note that you will need to use Colab Enterprise to obtain adequate GPU resources to run either 27B model without quantization.
+
+For an example of fine-tuning the 4B model, see the Fine-tuning notebook in Colab. The 27B models can be fine tuned in a similar manner but will require more time and compute resources than the 4B model.
+
+Model architecture overview
+The MedGemma model is built based on Gemma 3 and uses the same decoder-only transformer architecture as Gemma 3. To read more about the architecture, consult the Gemma 3 model card.
+
+Technical specifications
+Model type: Decoder-only Transformer architecture, see the Gemma 3 Technical Report
+
+Input Modalities: Text, vision
+
+Output Modality: Text only
+
+Attention mechanism: Grouped-query attention (GQA)
+
+Context length: Supports long context, at least 128K tokens
+
+Key publication: https://arxiv.org/abs/2507.05201
+
+Model created: July 9, 2025
+
+Model version: 1.0.1
+
+Citation
+When using this model, please cite: Sellergren et al. "MedGemma Technical Report." arXiv preprint arXiv:2507.05201 (2025).
+
+@article{sellergren2025medgemma,
+  title={MedGemma Technical Report},
+  author={Sellergren, Andrew and Kazemzadeh, Sahar and Jaroensri, Tiam and Kiraly, Atilla and Traverse, Madeleine and Kohlberger, Timo and Xu, Shawn and Jamil, Fayaz and Hughes, Cían and Lau, Charles and others},
+  journal={arXiv preprint arXiv:2507.05201},
+  year={2025}
+}
+
+Inputs and outputs
+Input:
+
+Text string, such as a question or prompt
+Images, normalized to 896 x 896 resolution and encoded to 256 tokens each
+Total input length of 128K tokens
+Output:
+
+Generated text in response to the input, such as an answer to a question, analysis of image content, or a summary of a document
+Total output length of 8192 tokens
+Performance and validation
+MedGemma was evaluated across a range of different multimodal classification, report generation, visual question answering, and text-based tasks.
+
+Key performance metrics
+Imaging evaluations
+The multimodal performance of MedGemma 4B and 27B multimodal was evaluated across a range of benchmarks, focusing on radiology, dermatology, histopathology, ophthalmology, and multimodal clinical reasoning.
+
+MedGemma 4B outperforms the base Gemma 3 4B model across all tested multimodal health benchmarks.
+
+Task and metric	Gemma 3 4B	MedGemma 4B
+Medical image classification
+MIMIC CXR** - macro F1 for top 5 conditions	81.2	88.9
+CheXpert CXR - macro F1 for top 5 conditions	32.6	48.1
+CXR14 - macro F1 for 3 conditions	32.0	50.1
+PathMCQA* (histopathology, internal**) - Accuracy	37.1	69.8
+US-DermMCQA* - Accuracy	52.5	71.8
+EyePACS* (fundus, internal) - Accuracy	14.4	64.9
+Visual question answering
+SLAKE (radiology) - Tokenized F1	40.2	72.3
+VQA-RAD*** (radiology) - Tokenized F1	33.6	49.9
+Knowledge and reasoning
+MedXpertQA (text + multimodal questions) - Accuracy	16.4	18.8
+*Internal datasets. US-DermMCQA is described in Liu (2020, Nature medicine), presented as a 4-way MCQ per example for skin condition classification. PathMCQA is based on multiple datasets, presented as 3-9 way MCQ per example for identification, grading, and subtype for breast, cervical, and prostate cancer. EyePACS is a dataset of fundus images with classification labels based on 5-level diabetic retinopathy severity (None, Mild, Moderate, Severe, Proliferative). More details in the MedGemma Technical Report.
+
+**Based on radiologist adjudicated labels, described in Yang (2024, arXiv) Section A.1.1.
+
+***Based on "balanced split," described in Yang (2024, arXiv).
+
+Chest X-ray report generation
+MedGemma chest X-ray (CXR) report generation performance was evaluated on MIMIC-CXR using the RadGraph F1 metric. We compare the MedGemma pre-trained checkpoint with our previous best model for CXR report generation, PaliGemma 2.
+
+Metric	MedGemma 4B (pre-trained)	MedGemma 4B (tuned for CXR)	PaliGemma 2 3B (tuned for CXR)	PaliGemma 2 10B (tuned for CXR)
+MIMIC CXR - RadGraph F1	29.5	30.3	28.8	29.5
+The instruction-tuned versions of MedGemma 4B and MedGemma 27B achieve lower scores (21.9 and 21.3, respectively) due to the differences in reporting style compared to the MIMIC ground truth reports. Further fine-tuning on MIMIC reports enables users to achieve improved performance, as shown by the improved performance of the MedGemma 4B model that was tuned for CXR.
+
+Text evaluations
+MedGemma 4B and text-only MedGemma 27B were evaluated across a range of text-only benchmarks for medical knowledge and reasoning.
+
+The MedGemma models outperform their respective base Gemma models across all tested text-only health benchmarks.
+
+Metric	Gemma 3 4B	MedGemma 4B
+MedQA (4-op)	50.7	64.4
+MedMCQA	45.4	55.7
+PubMedQA	68.4	73.4
+MMLU Med	67.2	70.0
+MedXpertQA (text only)	11.6	14.2
+AfriMed-QA (25 question test set)	48.0	52.0
+For all MedGemma 27B results, test-time scaling is used to improve performance.
+
+Medical record evaluations
+All models were evaluated on a question answer dataset from synthetic FHIR data to answer questions about patient records. MedGemma 27B multimodal's FHIR-specific training gives it significant improvement over other MedGemma and Gemma models.
+
+Metric	Gemma 3 4B	MedGemma 4B
+EHRQA	70.9	67.6
+Ethics and safety evaluation
+Evaluation approach
+Our evaluation methods include structured evaluations and internal red-teaming testing of relevant content policies. Red-teaming was conducted by a number of different teams, each with different goals and human evaluation metrics. These models were evaluated against a number of different categories relevant to ethics and safety, including:
+
+Child safety: Evaluation of text-to-text and image-to-text prompts covering child safety policies, including child sexual abuse and exploitation.
+Content safety: Evaluation of text-to-text and image-to-text prompts covering safety policies, including harassment, violence and gore, and hate speech.
+Representational harms: Evaluation of text-to-text and image-to-text prompts covering safety policies, including bias, stereotyping, and harmful associations or inaccuracies.
+General medical harms: Evaluation of text-to-text and image-to-text prompts covering safety policies, including information quality and harmful associations or inaccuracies.
+In addition to development level evaluations, we conduct "assurance evaluations" which are our "arms-length" internal evaluations for responsibility governance decision making. They are conducted separately from the model development team, to inform decision making about release. High-level findings are fed back to the model team, but prompt sets are held out to prevent overfitting and preserve the results' ability to inform decision making. Notable assurance evaluation results are reported to our Responsibility & Safety Council as part of release review.
+
+Evaluation results
+For all areas of safety testing, we saw safe levels of performance across the categories of child safety, content safety, and representational harms. All testing was conducted without safety filters to evaluate the model capabilities and behaviors. For text-to-text, image-to-text, and audio-to-text, and across both MedGemma model sizes, the model produced minimal policy violations. A limitation of our evaluations was that they included primarily English language prompts.
+
+Data card
+Dataset overview
+Training
+The base Gemma models are pre-trained on a large corpus of text and code data. MedGemma 4B utilizes a SigLIP image encoder that has been specifically pre-trained on a variety of de-identified medical data, including radiology images, histopathology images, ophthalmology images, and dermatology images. Its LLM component is trained on a diverse set of medical data, including medical text relevant to radiology images, chest-x rays, histopathology patches, ophthalmology images and dermatology images.
+
+Evaluation
+MedGemma models have been evaluated on a comprehensive set of clinically relevant benchmarks, including over 22 datasets across 5 different tasks and 6 medical image modalities. These include both open benchmark datasets and curated datasets, with a focus on expert human evaluations for tasks like CXR report generation and radiology VQA.
+
+Ethics and safety evaluation
+Evaluation approach
+Our evaluation methods include structured evaluations and internal red-teaming testing of relevant content policies. Red-teaming was conducted by a number of different teams, each with different goals and human evaluation metrics. These models were evaluated against a number of different categories relevant to ethics and safety, including:
+
+Child safety: Evaluation of text-to-text and image-to-text prompts covering child safety policies, including child sexual abuse and exploitation.
+Content safety: Evaluation of text-to-text and image-to-text prompts covering safety policies, including harassment, violence and gore, and hate speech.
+Representational harms: Evaluation of text-to-text and image-to-text prompts covering safety policies, including bias, stereotyping, and harmful associations or inaccuracies.
+General medical harms: Evaluation of text-to-text and image-to-text prompts covering safety policies, including information quality and harmful associations or inaccuracies.
+In addition to development level evaluations, we conduct "assurance evaluations" which are our "arms-length" internal evaluations for responsibility governance decision making. They are conducted separately from the model development team, to inform decision making about release. High-level findings are fed back to the model team, but prompt sets are held out to prevent overfitting and preserve the results' ability to inform decision making. Notable assurance evaluation results are reported to our Responsibility & Safety Council as part of release review.
+
+Evaluation results
+For all areas of safety testing, we saw safe levels of performance across the categories of child safety, content safety, and representational harms. All testing was conducted without safety filters to evaluate the model capabilities and behaviors. For text-to-text, image-to-text, and audio-to-text, and across both MedGemma model sizes, the model produced minimal policy violations. A limitation of our evaluations was that they included primarily English language prompts.
+
+Data card
+Dataset overview
+Training
+The base Gemma models are pre-trained on a large corpus of text and code data. MedGemma multimodal variants utilize a SigLIP image encoder that has been specifically pre-trained on a variety of de-identified medical data, including radiology images, histopathology images, ophthalmology images, and dermatology images. Their LLM component is trained on a diverse set of medical data, including medical text, medical question-answer pairs, FHIR-based electronic health record data (27B multimodal only), radiology images, histopathology patches, ophthalmology images, and dermatology images.
+
+Evaluation
+MedGemma models have been evaluated on a comprehensive set of clinically relevant benchmarks, including over 22 datasets across 6 different tasks and 4 medical image modalities. These benchmarks include both open and internal datasets.
+
+Source
+MedGemma utilizes a combination of public and private datasets.
+
+This model was trained on diverse public datasets including MIMIC-CXR (chest X-rays and reports), ChestImaGenome: Set of bounding boxes linking image findings with anatomical regions for MIMIC-CXR (MedGemma 27B multimodal only), SLAKE (multimodal medical images and questions), PAD-UFES-20 (skin lesion images and data), SCIN (dermatology images), TCGA (cancer genomics data), CAMELYON (lymph node histopathology images), PMC-OA (biomedical literature with images), and Mendeley Digital Knee X-Ray (knee X-rays).
+
+Additionally, multiple diverse proprietary datasets were licensed and incorporated (described next).
+
+Data Ownership and Documentation
+MIMIC-CXR: MIT Laboratory for Computational Physiology and Beth Israel Deaconess Medical Center (BIDMC).
+Slake-VQA: The Hong Kong Polytechnic University (PolyU), with collaborators including West China Hospital of Sichuan University and Sichuan Academy of Medical Sciences / Sichuan Provincial People's Hospital.
+PAD-UFES-20: Federal University of Espírito Santo (UFES), Brazil, through its Dermatological and Surgical Assistance Program (PAD).
+SCIN: A collaboration between Google Health and Stanford Medicine.
+TCGA (The Cancer Genome Atlas): A joint effort of National Cancer Institute and National Human Genome Research Institute. Data from TCGA are available via the Genomic Data Commons (GDC)
+CAMELYON: The data was collected from Radboud University Medical Center and University Medical Center Utrecht in the Netherlands.
+PMC-OA (PubMed Central Open Access Subset): Maintained by the National Library of Medicine (NLM) and National Center for Biotechnology Information (NCBI), which are part of the NIH.
+MedQA: This dataset was created by a team of researchers led by Di Jin, Eileen Pan, Nassim Oufattole, Wei-Hung Weng, Hanyi Fang, and Peter Szolovits
+Mendeley Digital Knee X-Ray: This dataset is from Rani Channamma University, and is hosted on Mendeley Data.
+AfriMed-QA: This data was developed and led by multiple collaborating organizations and researchers include key contributors: Intron Health, SisonkeBiotik, BioRAMP, Georgia Institute of Technology, and MasakhaneNLP.
+VQA-RAD: This dataset was created by a research team led by Jason J. Lau, Soumya Gayen, Asma Ben Abacha, and Dina Demner-Fushman and their affiliated institutions (the US National Library of Medicine and National Institutes of Health)
+Chest ImaGenome: IBM Research.
+MedExpQA: This dataset was created by researchers at the HiTZ Center (Basque Center for Language Technology and Artificial Intelligence).
+MedXpertQA: This dataset was developed by researchers at Tsinghua University (Beijing, China) and Shanghai Artificial Intelligence Laboratory (Shanghai, China).
+HealthSearchQA: This dataset consists of consisting of 3,173 commonly searched consumer questions
+In addition to the public datasets listed above, MedGemma was also trained on de-identified, licensed datasets or datasets collected internally at Google from consented participants.
+
+Radiology dataset 1: De-identified dataset of different CT studies across body parts from a US-based radiology outpatient diagnostic center network.
+Ophthalmology dataset 1 (EyePACS): De-identified dataset of fundus images from diabetic retinopathy screening.
+Dermatology dataset 1: De-identified dataset of teledermatology skin condition images (both clinical and dermatoscopic) from Colombia.
+Dermatology dataset 2: De-identified dataset of skin cancer images (both clinical and dermatoscopic) from Australia.
+Dermatology dataset 3: De-identified dataset of non-diseased skin images from an internal data collection effort.
+Pathology dataset 1: De-identified dataset of histopathology H&E whole slide images created in collaboration with an academic research hospital and biobank in Europe. Comprises de-identified colon, prostate, and lymph nodes.
+Pathology dataset 2: De-identified dataset of lung histopathology H&E and IHC whole slide images created by a commercial biobank in the United States.
+Pathology dataset 3: De-identified dataset of prostate and lymph node H&E and IHC histopathology whole slide images created by a contract research organization in the United States.
+Pathology dataset 4: De-identified dataset of histopathology whole slide images created in collaboration with a large, tertiary teaching hospital in the United States. Comprises a diverse set of tissue and stain types, predominantly H&E.
+EHR dataset 1: Question/answer dataset drawn from synthetic FHIR records created by Synthea. The test set includes 19 unique patients with 200 questions per patient divided into 10 different categories.

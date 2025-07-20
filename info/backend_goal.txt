@@ -1,0 +1,62 @@
+จัดไปครับ! มาอัปเดต Goals ของเราให้สอดคล้องกับสถาปัตยกรรม **Multi-agent** และ **Workflow 2 ขั้นตอน** ล่าสุดที่เราเพิ่งออกแบบกัน นี่คือเป้าหมายใหม่สำหรับฝั่ง Backend ที่ชัดเจนและพร้อมให้ลงมือทำครับ
+
+---
+
+### **🎯 New Backend Goals (อัปเดตล่าสุด: 20 กรกฎาคม 2568)**
+
+#### **1. สถาปัตยกรรมหลักและ Chief-BOT (Core Architecture & Chief-BOT)**
+
+* `[ ]` **Define `TriageCase` Data Structure:** สร้าง Pydantic model ที่ชัดเจนสำหรับรับข้อมูลเคสใหม่ ซึ่งต้องรองรับข้อมูลทุกรูปแบบ: ข้อความอาการ (text), ข้อมูลที่มีโครงสร้าง (structured data เช่น ผลเลือดในรูปแบบ JSON), และ ID/path ของรูปภาพ
+* `[ ]` **Implement Chief-BOT Orchestrator:** เขียน Logic การทำงานหลักของ Chief-BOT ที่จะ:
+    1.  รับ `TriageCase` เข้ามา
+    2.  เรียกใช้ `VisionBOT_Agent` และ `TextBOT_Agent` พร้อมกันแบบ Asynchronous (`asyncio.gather`)
+    3.  รอจนกว่าจะได้ผลลัพธ์สุดท้าย (Synthesized Output) จากทั้งสอง Agent
+* `[ ]` **Develop Final Prioritization Algorithm:** ออกแบบและเขียนฟังก์ชันสำหรับคำนวณ **"Final Triage Score"** โดยนำผลลัพธ์ที่ได้จาก Agent ทั้งสองมาประมวลผลร่วมกัน (เช่น ใช้ค่า risk score, keyword จากบทสรุป) เพื่อจัดลำดับความสำคัญของเคส
+
+---
+
+#### **2. Workflow ของ 👁️ VisionBOT Agent**
+
+* `[ ]` **Build Vision "Tool" Pipeline (Process 1):**
+    * สร้างฟังก์ชันที่รับ `image_path` เข้ามา
+    * โหลดและรันโมเดล **CNN เฉพาะทาง** (ResNet/EfficientNet)
+    * คืนค่าผลลัพธ์ดิบ (Raw Prediction) ในรูปแบบ `dictionary` ที่มีโครงสร้างชัดเจน (เช่น `{'class': 3, 'disease': 'Severe DR', 'confidence': 0.92}`)
+* `[ ]` **Build Vision "Synthesizer" Pipeline (Process 2):**
+    * สร้างฟังก์ชันที่รับ "ผลลัพธ์ดิบ" จากขั้นตอนที่ 1
+    * นำผลลัพธ์นั้นมาสร้างเป็น Prompt ที่เหมาะสมสำหรับ **`google/medgemma-4b-it`**
+    * เรียกใช้ LLM และคืนค่าเป็น "บทสรุปเชิงคลินิก" ที่เป็นข้อความสมบูรณ์
+* `[ ]` **Package into a Single Agent Function:** รวม 2 ฟังก์ชันข้างต้นให้เป็นฟังก์ชันเดียวที่ง่ายต่อการเรียกใช้ เช่น `async def run_vision_agent(image_path: str)` เพื่อให้ Chief-BOT เรียกใช้งานได้สะดวก
+
+---
+
+#### **3. Workflow ของ ✍️ TextBOT Agent**
+
+* `[ ]` **Build Text/Data "Tool" Pipeline (Process 1):**
+    * สร้างฟังก์ชันที่รับ `structured_data` (เช่น dict ของผลเลือด) เข้ามา
+    * มี Logic ในการเลือก **โมเดล Scikit-learn ที่เหมาะสม** (เช่น ถ้ามีค่า FBS จะใช้โมเดลเบาหวาน, ถ้ามีค่า Cholesterol จะใช้โมเดลโรคหัวใจ)
+    * รันโมเดลและคืนค่าผลลัพธ์ดิบในรูปแบบ `dictionary` (เช่น `{'risk_score': 0.87, 'model_used': 'HeartDisease_RandomForest'}`)
+* `[ ]` **Build Text "Synthesizer" Pipeline (Process 2):**
+    * สร้างฟังก์ชันที่รับ "ผลลัพธ์ดิบ" จากขั้นตอนที่ 1 **และ** "ข้อความอาการดั้งเดิม"
+    * นำข้อมูลทั้งสองส่วนมาสร้างเป็น Prompt สำหรับ **`google/medgemma-4b-it`**
+    * เรียกใช้ LLM และคืนค่าเป็น "บทสรุปที่เชื่อมโยงอาการกับผลการวิเคราะห์"
+* `[ ]` **Package into a Single Agent Function:** รวม 2 ฟังก์ชันข้างต้นให้เป็นฟังก์ชันเดียว เช่น `async def run_text_agent(symptoms: str, structured_data: dict)`
+
+---
+
+#### **4. การจัดการข้อมูลและฐานข้อมูล (Data & Database Management)**
+
+* `[ ]` **Update Database Schema for Detailed Logging:** แก้ไขตาราง `examinations` เพื่อเพิ่มคอลัมน์สำหรับเก็บข้อมูลแต่ละขั้นตอนของ Workflow ใหม่ ได้แก่:
+    * `raw_vision_output` (JSON)
+    * `synthesized_vision_output` (TEXT)
+    * `raw_text_output` (JSON)
+    * `synthesized_text_output` (TEXT)
+    * `final_triage_score` (REAL)
+* `[ ]` **Implement Final Save Logic:** เขียนฟังก์ชันสำหรับบันทึกข้อมูลทั้งหมดนี้ลงฐานข้อมูลหลังจากที่ Chief-BOT ทำงานเสร็จสิ้นในแต่ละเคส
+
+---
+
+#### **5. API และ Infrastructure**
+
+* `[ ]` **Refactor Main `/triage` Endpoint:** ปรับปรุง Endpoint หลักให้รองรับ `TriageCase` Pydantic model และเป็นตัวจุดชนวนการทำงานของ Chief-BOT Orchestrator
+* `[ ]` **Ensure Non-Blocking Execution:** ตรวจสอบและใช้ `run_in_threadpool` กับทุกการเรียกใช้โมเดลที่ใช้เวลาประมวลผลนาน (`cnn.predict()`, `sklearn.predict()`, `llm_pipeline()`) เพื่อให้แน่ใจว่าเซิร์ฟเวอร์ยังคงตอบสนองได้ดี
+* `[ ]` **Prepare for Deployment:** สร้าง `Dockerfile` ที่ติดตั้ง Dependencies ทั้งหมด (รวมถึง library ของ ML/AI ทุกตัว) เพื่อเตรียมพร้อมสำหรับการนำไปใช้งานจริง
