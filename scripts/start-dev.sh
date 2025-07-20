@@ -46,6 +46,18 @@ if ! command -v docker-compose &> /dev/null; then
     exit 1
 fi
 
+# Check if .env file exists, create from example if not
+if [ ! -f .env ]; then
+    if [ -f .env.example ]; then
+        print_warning ".env file not found, copying from .env.example"
+        cp .env.example .env
+        print_status "Please review and update .env file with your settings"
+    else
+        print_error ".env file not found and no .env.example available"
+        exit 1
+    fi
+fi
+
 # Navigate to the backend directory
 cd "$(dirname "$0")/.."
 
@@ -53,7 +65,19 @@ print_status "Current directory: $(pwd)"
 
 # Create necessary directories if they don't exist
 print_status "Creating necessary directories..."
-mkdir -p logs uploads config/ssl
+mkdir -p logs uploads config/ssl models models/transformers models/datasets
+
+# Set environment variables for MedGemma
+export HF_TOKEN=${HF_TOKEN:-"your_huggingface_token_here"}
+export MEDGEMMA_MODEL_SIZE=${MEDGEMMA_MODEL_SIZE:-"medium"}
+export MEDGEMMA_DEPLOYMENT_MODE=${MEDGEMMA_DEPLOYMENT_MODE:-"development"}
+export MEDGEMMA_QUANTIZATION=${MEDGEMMA_QUANTIZATION:-"true"}
+
+print_status "MedGemma Configuration:"
+echo "  Model Size: $MEDGEMMA_MODEL_SIZE"
+echo "  Deployment Mode: $MEDGEMMA_DEPLOYMENT_MODE"
+echo "  Quantization: $MEDGEMMA_QUANTIZATION"
+echo "  HF Token: ${HF_TOKEN:0:10}..." # Show only first 10 chars for security
 
 # Stop any existing containers
 print_status "Stopping any existing containers..."
@@ -63,9 +87,9 @@ docker-compose -f docker-compose.dev.yml down --remove-orphans
 # print_warning "Removing orphaned volumes..."
 # docker volume prune -f
 
-# Build the images
-print_status "Building Docker images..."
-docker-compose -f docker-compose.dev.yml build --no-cache
+# Build the images with HF token
+print_status "Building Docker images with MedGemma support..."
+docker-compose -f docker-compose.dev.yml build --no-cache --build-arg HF_TOKEN=${HF_TOKEN}
 
 # Start the services
 print_status "Starting services..."
@@ -121,10 +145,17 @@ echo "📊 Database:"
 echo "   PostgreSQL: localhost:5432"
 echo "   Redis: localhost:6379"
 echo ""
+echo "🤖 MedGemma AI:"
+echo "   Model Size: $MEDGEMMA_MODEL_SIZE"
+echo "   Quantization: $MEDGEMMA_QUANTIZATION"
+echo "   Cache Directory: ./models"
+echo ""
 echo "🔧 Useful commands:"
 echo "   View logs: docker-compose -f docker-compose.dev.yml logs -f"
 echo "   Stop services: docker-compose -f docker-compose.dev.yml down"
 echo "   Restart a service: docker-compose -f docker-compose.dev.yml restart <service>"
+echo "   Test MedGemma: docker-compose -f docker-compose.dev.yml exec backend python scripts/test_medgemma.py"
+echo "   Interactive shell: docker-compose -f docker-compose.dev.yml exec backend python scripts/docker-entrypoint.sh shell"
 echo ""
 print_status "To view real-time logs, run:"
 echo "   docker-compose -f docker-compose.dev.yml logs -f"
