@@ -1,0 +1,44 @@
+# Database Migration Dockerfile for Medical Triage-BOTS
+FROM python:3.11-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONHASHSEED=random \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    gcc \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# Set work directory
+WORKDIR /app
+
+# Install Python dependencies
+COPY requirements_python310.txt api_requirements.txt ./
+RUN pip install --no-cache-dir -r api_requirements.txt
+
+# Copy migration scripts and app modules
+COPY app/ ./app/
+COPY migrate_db.py ./
+COPY main.py ./
+
+# Create necessary directories
+RUN mkdir -p /app/logs && \
+    chown -R appuser:appuser /app
+
+USER appuser
+
+# Set Python path
+ENV PYTHONPATH=/app
+
+# Default command to run migrations
+CMD ["python", "migrate_db.py"]
